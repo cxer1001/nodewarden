@@ -48,18 +48,24 @@ jobs:
       - name: Remove cron triggers for current Cloudflare account limit
         if: steps.cf.outputs.ready == 'true'
         run: |
-          node - <<'JS'
-          const fs = require('fs');
-          const file = 'wrangler.toml';
-          let text = fs.readFileSync(file, 'utf8');
-          text = text.replace(/?
-[triggers]?
-crons = [ [^
-]*]?
-/g, '
-');
-          fs.writeFileSync(file, text);
-          JS
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('wrangler.toml')
+          lines = p.read_text(encoding='utf-8').splitlines()
+          out = []
+          i = 0
+          while i < len(lines):
+              if lines[i].strip() == '[triggers]':
+                  i += 1
+                  while i < len(lines) and lines[i].strip() and not lines[i].lstrip().startswith('['):
+                      i += 1
+                  continue
+              out.append(lines[i])
+              i += 1
+          p.write_text('
+'.join(out) + '
+', encoding='utf-8')
+          PY
 
       - name: Deploy Worker
         if: steps.cf.outputs.ready == 'true'
