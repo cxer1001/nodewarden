@@ -62,9 +62,7 @@ jobs:
                   continue
               out.append(lines[i])
               i += 1
-          p.write_text('
-'.join(out) + '
-', encoding='utf-8')
+          p.write_text(chr(10).join(out) + chr(10), encoding='utf-8')
           PY
 
       - name: Deploy Worker
