@@ -1,0 +1,66 @@
+name: Deploy to Cloudflare
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check Cloudflare secrets
+        id: cf
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare secrets are not configured. Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to enable automatic deployment."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.cf.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: steps.cf.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.cf.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Remove cron triggers for current Cloudflare account limit
+        if: steps.cf.outputs.ready == 'true'
+        run: |
+          node - <<'JS'
+          const fs = require('fs');
+          const file = 'wrangler.toml';
+          let text = fs.readFileSync(file, 'utf8');
+          text = text.replace(/?
+[triggers]?
+crons = [ [^
+]*]?
+/g, '
+');
+          fs.writeFileSync(file, text);
+          JS
+
+      - name: Deploy Worker
+        if: steps.cf.outputs.ready == 'true'
+        run: npx wrangler deploy
