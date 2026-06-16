@@ -892,6 +892,10 @@
     font-size: 13px;
   }
 
+  .totp-code-main strong {
+    font-size: 20px;
+  }
+
   .settings-module .field,
   .auth-card .field {
     margin-bottom: 8px;
